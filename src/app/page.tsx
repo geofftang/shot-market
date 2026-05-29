@@ -4,7 +4,8 @@ import { BettingCard } from '@/components/BettingCard';
 import Link from 'next/link';
 import { TrendingUp, Users, PlusCircle, MessageSquare, Trash2 } from 'lucide-react';
 import { getCpmmProbability, formatProbability } from '@/lib/engine/cpmm';
-import { deleteMarketAction } from '@/app/actions/market';
+import { deleteMarketAction, resolveMarketAction } from '@/app/actions/market';
+import { CheckCircle2, XCircle } from 'lucide-react';
 
 export const revalidate = 0; // Disable cache for live data
 
@@ -123,6 +124,38 @@ export default async function Home() {
           </div>
 
           <div className="flex flex-col gap-8 sticky top-32">
+            {/* RESOLUTION CONTROLS (For Creator) */}
+            {featuredMarket.creator_id === user?.id && (
+              <div className="bg-slate-900 border border-emerald-500/20 p-8 rounded-[2rem] shadow-2xl">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 mb-6">Settlement Control</h3>
+                <form action={resolveMarketAction} className="space-y-4">
+                  <input type="hidden" name="marketId" value={featuredMarket.id} />
+                  <textarea 
+                    name="reason"
+                    required
+                    placeholder="Provide proof or reason..."
+                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder:text-slate-800 resize-none mb-2"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      name="outcome"
+                      value="resolved_yes"
+                      className="bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      <CheckCircle2 className="w-4 h-4" /> Resolve YES
+                    </button>
+                    <button 
+                      name="outcome"
+                      value="resolved_no"
+                      className="bg-rose-500 hover:bg-rose-400 text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      <XCircle className="w-4 h-4" /> Resolve NO
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
             <BettingCard 
               marketId={featuredMarket.id}
               userId="00000000-0000-0000-0000-000000000000"

@@ -12,34 +12,75 @@ export async function createMarketAction(formData: FormData) {
 }
 
 export async function deleteMarketAction(marketId: string) {
+  // ... existing code
+}
+
+export async function resolveMarketAction(formData: FormData) {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  // 1. Verify ownership and check for bets
+  const marketId = formData.get('marketId') as string;
+  const outcome = formData.get('outcome') as 'resolved_yes' | 'resolved_no';
+  const reason = formData.get('reason') as string;
+
+  if (!marketId || !outcome || !reason) throw new Error('Market ID, outcome, and reason are required');
+
+  // 1. Verify ownership
   const { data: market, error: marketError } = await supabase
     .from('markets')
-    .select('creator_id, bets(count)')
+    .select('*')
     .eq('id', marketId)
     .single();
 
   if (marketError || !market) throw new Error('Market not found');
-  if (market.creator_id !== user.id) throw new Error('Only the creator can delete this market');
-  
-  const betCount = market.bets?.[0]?.count || 0;
-  if (betCount > 0) {
-    throw new Error('Cannot delete a market that already has bets. Settle it instead.');
-  }
+  if (market.creator_id !== user.id) throw new Error('Only the creator can resolve this market');
+  if (market.status !== 'open') throw new Error('Market is already resolved');
 
-  // 2. Perform delete
-  const { error: deleteError } = await supabase
+  // 2. Fetch all winning bets
+  const winningOutcome = outcome === 'resolved_yes' ? 'YES' : 'NO';
+  const { data: winningBets, error: betsError } = await supabase
+    .from('bets')
+    .select('user_id, shares')
+    .eq('market_id', marketId)
+    .eq('outcome', winningOutcome);
+
+  if (betsError) throw new Error(betsError.message);
+
+  // 3. Payout winners & Close market (Transaction-like sequence)
+  // In a real app, use a DB function/RPC for atomicity. 
+  // For MVP, we'll loop and update.
+  
+  // Close the market first
+  await supabase
     .from('markets')
-    .delete()
+    .update({ 
+      status: outcome, 
+      closed_at: new Date().toISOString(),
+      description: market.description + `\n\nRESOLUTION: ${reason}` 
+    })
     .eq('id', marketId);
 
-  if (deleteError) throw new Error(deleteError.message);
+  // Pay out each winner
+  if (winningBets && winningBets.length > 0) {
+    for (const bet of winningBets) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('credits')
+        .eq('id', bet.user_id)
+        .single();
+        
+      if (profile) {
+        await supabase
+          .from('profiles')
+          .update({ credits: parseFloat(profile.credits) + parseFloat(bet.shares) })
+          .eq('id', bet.user_id);
+      }
+    }
+  }
 
   revalidatePath('/');
+  revalidatePath('/leaderboard');
   redirect('/');
 }
