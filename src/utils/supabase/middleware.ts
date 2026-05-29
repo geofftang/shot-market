@@ -27,9 +27,24 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // This will refresh session if expired - required for Server Components
-  // https://supabase.com/docs/guides/auth/server-side/nextjs
-  await supabase.auth.getUser()
+  // 1. Get the user
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // 2. Redirect to onboarding if authenticated but no username
+  if (user && !request.nextUrl.pathname.startsWith('/onboarding') && !request.nextUrl.pathname.startsWith('/auth')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .single()
+
+    // If profile exists but username is still an email or placeholder, redirect
+    if (profile && (!profile.username || profile.username.includes('@'))) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/onboarding'
+      return NextResponse.redirect(url)
+    }
+  }
 
   return supabaseResponse
 }
