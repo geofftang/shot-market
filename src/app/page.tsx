@@ -1,16 +1,16 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/server';
 import { MarketChart } from '@/components/MarketChart';
 import { BettingCard } from '@/components/BettingCard';
 import Link from 'next/link';
-import { TrendingUp, Users, PlusCircle, MessageSquare } from 'lucide-react';
+import { TrendingUp, Users, PlusCircle, MessageSquare, Trash2 } from 'lucide-react';
 import { getCpmmProbability, formatProbability } from '@/lib/engine/cpmm';
+import { deleteMarketAction } from '@/app/actions/market';
 
 export const revalidate = 0; // Disable cache for live data
 
 export default async function Home() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
   // 1. Fetch all open markets
   const { data: markets, error: marketError } = await supabase
@@ -59,6 +59,13 @@ export default async function Home() {
             <h1 className="text-6xl font-black tracking-tighter leading-[0.9] mb-4 max-w-4xl text-balance">
               {featuredMarket.question}
             </h1>
+            {featuredMarket.creator_id === user?.id && featuredVolume === 0 && (
+              <form action={deleteMarketAction.bind(null, featuredMarket.id)}>
+                <button className="flex items-center gap-2 text-rose-500 hover:text-rose-400 text-[10px] font-black uppercase tracking-widest transition-colors mb-4">
+                  <Trash2 className="w-3 h-3" /> Delete Market
+                </button>
+              </form>
+            )}
             {featuredMarket.description && (
               <p className="text-slate-400 text-xl max-w-2xl font-medium">
                 {featuredMarket.description}

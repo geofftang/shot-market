@@ -8,30 +8,37 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function createMarketAction(formData: FormData) {
+  // ... existing code
+}
+
+export async function deleteMarketAction(marketId: string) {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   
-  const question = formData.get('question') as string;
-  const description = formData.get('description') as string;
-  const initialLiquidity = parseFloat(formData.get('initialLiquidity') as string) || 100;
-  const userId = formData.get('userId') as string || '00000000-0000-0000-0000-000000000000'; // Default system user for now
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
 
-  if (!question) throw new Error('Question is required');
-
-  const { data: market, error } = await supabase
+  // 1. Verify ownership and check for bets
+  const { data: market, error: marketError } = await supabase
     .from('markets')
-    .insert({
-      question,
-      description,
-      creator_id: userId,
-      yes_pool: initialLiquidity,
-      no_pool: initialLiquidity,
-      p: 0.5,
-      status: 'open'
-    })
-    .select()
+    .select('creator_id, bets(count)')
+    .eq('id', marketId)
     .single();
 
-  if (error) throw new Error(error.message);
+  if (marketError || !market) throw new Error('Market not found');
+  if (market.creator_id !== user.id) throw new Error('Only the creator can delete this market');
+  
+  const betCount = market.bets?.[0]?.count || 0;
+  if (betCount > 0) {
+    throw new Error('Cannot delete a market that already has bets. Settle it instead.');
+  }
+
+  // 2. Perform delete
+  const { error: deleteError } = await supabase
+    .from('markets')
+    .delete()
+    .eq('id', marketId);
+
+  if (deleteError) throw new Error(deleteError.message);
 
   revalidatePath('/');
   redirect('/');
