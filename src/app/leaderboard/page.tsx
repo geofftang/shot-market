@@ -23,15 +23,9 @@ export default async function LeaderboardPage() {
         </Link>
 
         <header className="mb-16">
-          <div className="flex items-center gap-3 text-emerald-500 font-black tracking-tighter text-sm uppercase mb-3 italic">
-            <Trophy className="w-5 h-5" /> The Hall of Fame
-          </div>
-          <h1 className="text-6xl font-black tracking-tighter leading-none mb-4">
-            Board of Board
+          <h1 className="text-8xl font-black tracking-tighter leading-none mb-4 italic">
+            BOARD OF SHAME
           </h1>
-          <p className="text-slate-400 text-lg font-medium">
-            The oracles vs. the debtors. Total accountability.
-          </p>
         </header>
 
         <div className="space-y-4">
