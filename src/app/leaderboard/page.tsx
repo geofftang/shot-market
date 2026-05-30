@@ -21,12 +21,12 @@ export default async function LeaderboardPage() {
   const { data: activeBets } = await supabase
     .from('bets')
     .select('user_id, market_id, outcome, shares')
-    .in('market_id', activeMarkets?.map(m => m.id) || []);
+    .in('market_id', activeMarkets?.map((m: any) => m.id) || []);
 
-  const leaderboardData = (profiles || []).map(profile => {
-    const userBets = (activeBets || []).filter(b => b.user_id === profile.id);
-    const equity = userBets.reduce((acc, bet) => {
-      const market = activeMarkets?.find(m => m.id === bet.market_id);
+  const leaderboardData = (profiles || []).map((profile: any) => {
+    const userBets = (activeBets || []).filter((b: any) => b.user_id === profile.id);
+    const equity = userBets.reduce((acc: number, bet: any) => {
+      const market = activeMarkets?.find((m: any) => m.id === bet.market_id);
       if (!market) return acc;
       
       const prob = (parseFloat(market.p) * parseFloat(market.no_pool)) / 
@@ -40,7 +40,7 @@ export default async function LeaderboardPage() {
       ...profile,
       netWorth: parseFloat(profile.credits) + equity
     };
-  }).sort((a, b) => b.netWorth - a.netWorth);
+  }).sort((a: any, b: any) => b.netWorth - a.netWorth);
 
   return (
     <main className="min-h-screen bg-black text-white p-8 font-sans pb-32">
@@ -58,7 +58,7 @@ export default async function LeaderboardPage() {
 
         <div className="space-y-4">
           {leaderboardData && leaderboardData.length > 0 ? (
-            leaderboardData.map((profile, idx) => {
+            leaderboardData.map((profile: any, idx: number) => {
               const isDebtor = profile.netWorth < 0;
               const isOracle = profile.netWorth > 0;
 

@@ -106,7 +106,7 @@ export default async function MarketPage({ params }: PageProps) {
               </h2>
               <div className="space-y-3">
                 {history && history.length > 0 ? (
-                  history.slice().reverse().map((bet, idx) => (
+                  history.slice().reverse().map((bet: any, idx: number) => (
                     <div key={idx} className="bg-white/5 border border-white/5 p-6 rounded-2xl flex flex-col gap-2">
                       <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
                         <span className={bet.outcome === 'YES' ? 'text-emerald-400' : 'text-rose-400'}>

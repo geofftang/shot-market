@@ -65,7 +65,7 @@ export function SettlementUtility({ marketId, answers }: SettlementUtilityProps)
         <div className="space-y-3">
           <label className="text-[9px] font-black uppercase text-slate-700 ml-2 tracking-widest">Select Decisive Winner</label>
           <div className="grid grid-cols-1 gap-2">
-            {answers.map((a) => (
+            {answers.map((a: any) => (
               <button 
                 key={a.id}
                 name="winnerId"

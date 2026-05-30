@@ -60,7 +60,6 @@ export async function updateWeightAction(formData: FormData) {
 
   revalidatePath('/', 'layout');
   revalidatePath('/leaderboard');
-  return { success: true };
 }
 
 export async function settleUpAction(formData: FormData) {
@@ -102,5 +101,4 @@ export async function settleUpAction(formData: FormData) {
 
   revalidatePath('/', 'layout');
   revalidatePath('/leaderboard');
-  return { success: true };
 }
