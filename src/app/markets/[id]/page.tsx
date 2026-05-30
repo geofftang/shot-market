@@ -144,7 +144,7 @@ export default async function MarketPage({ params }: PageProps) {
 
                 {/* DISCRETE SETTLEMENT CONTROLS (For Creator) */}
                 {market.creator_id === user?.id && (
-                  <SettlementUtility marketId={market.id} answers={answers.map(a => ({ id: a.id, text: a.text }))} />
+                  <SettlementUtility marketId={market.id} answers={answers.map((a: any) => ({ id: a.id, text: a.text }))} />
                 )}
               </>
             ) : (
