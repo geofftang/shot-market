@@ -138,7 +138,7 @@ export default async function MarketPage({ params }: PageProps) {
                 <BettingCard 
                   marketId={market.id}
                   userId={user?.id || null}
-                  answers={answers.map(a => ({ id: a.id, text: a.text, pool: parseFloat(a.pool) }))}
+                  answers={answers.map((a: any) => ({ id: a.id, text: a.text, pool: parseFloat(a.pool) }))}
                   outcomeType={market.outcome_type}
                 />
 
