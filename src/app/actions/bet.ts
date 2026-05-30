@@ -53,11 +53,11 @@ export async function placeBetAction(formData: FormData) {
     throw new Error('Market options not found');
   }
 
-  const selectedAnswer = answers.find(a => a.id === answerId);
+  const selectedAnswer = answers.find((a: any) => a.id === answerId);
   if (!selectedAnswer) throw new Error('Selected option not found');
 
   const pool: MultiPool = {};
-  answers.forEach(a => pool[a.id] = parseFloat(a.pool));
+  answers.forEach((a: any) => pool[a.id] = parseFloat(a.pool));
   
   // 4. Calculate the trade using the multi-engine
   const { shares, newPool } = calculateMultiPurchase(pool, answerId, amount);

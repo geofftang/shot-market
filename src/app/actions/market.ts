@@ -45,7 +45,7 @@ export async function createMarketAction(formData: FormData) {
     ]);
   } else {
     const rawAnswers = formData.getAll('answers') as string[];
-    const answers = rawAnswers.filter(a => a.trim().length > 0);
+    const answers = rawAnswers.filter((a: any) => a.trim().length > 0);
     if (answers.length < 2) throw new Error('At least 2 options are required for multiple choice');
 
     const answersToInsert = answers.map(text => ({

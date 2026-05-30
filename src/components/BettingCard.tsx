@@ -43,7 +43,7 @@ export function BettingCard({ marketId, userId, answers, outcomeType }: BettingC
   const numAmount = parseFloat(amount);
   const pool: MultiPool = useMemo(() => {
     const p: MultiPool = {};
-    answers.forEach(a => p[a.id] = a.pool);
+    answers.forEach((a: any) => p[a.id] = a.pool);
     return p;
   }, [answers]);
 
@@ -82,7 +82,7 @@ export function BettingCard({ marketId, userId, answers, outcomeType }: BettingC
         <label className="block text-[10px] font-black uppercase text-slate-500 mb-3 tracking-widest">Select Outcome</label>
         {outcomeType === 'binary' ? (
           <div className="flex p-1 bg-slate-950 rounded-xl border border-slate-800">
-            {answers.map((a) => (
+            {answers.map((a: any) => (
               <button
                 key={a.id}
                 onClick={() => setSelectedAnswerId(a.id)}
@@ -98,7 +98,7 @@ export function BettingCard({ marketId, userId, answers, outcomeType }: BettingC
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-2">
-            {answers.map((a) => (
+            {answers.map((a: any) => (
               <button
                 key={a.id}
                 onClick={() => setSelectedAnswerId(a.id)}
@@ -202,7 +202,7 @@ export function BettingCard({ marketId, userId, answers, outcomeType }: BettingC
           <input type="hidden" name="marketId" value={marketId} />
           <input type="hidden" name="answerId" value={selectedAnswerId} />
           <input type="hidden" name="amount" value={amount} />
-          <input type="hidden" name="outcome" value={answers.find(a => a.id === selectedAnswerId)?.text || ''} />
+          <input type="hidden" name="outcome" value={answers.find((a: any) => a.id === selectedAnswerId)?.text || ''} />
           <input type="hidden" name="comment" value={comment} />
           
           <button

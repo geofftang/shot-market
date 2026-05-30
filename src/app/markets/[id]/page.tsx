@@ -153,9 +153,9 @@ export default async function MarketPage({ params }: PageProps) {
                   Market Closed
                 </div>
                 <div className={`text-2xl font-black italic uppercase tracking-tighter ${
-                  answers.find(a => a.is_winner)?.text === 'YES' ? 'text-emerald-500' : 'text-rose-500'
+                  answers.find((a: any) => a.is_winner)?.text === 'YES' ? 'text-emerald-500' : 'text-rose-500'
                 }`}>
-                  Resolved {answers.find(a => a.is_winner)?.text || 'UNKNOWN'}
+                  Resolved {answers.find((a: any) => a.is_winner)?.text || 'UNKNOWN'}
                 </div>
               </div>
             )}
