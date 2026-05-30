@@ -45,7 +45,8 @@ export function NavBar({ initialUser, initialUsername }: NavBarProps) {
     router.push('/login');
   };
 
-  const displayName = username || user?.email?.split('@')[0];
+  // Derive the display name purely from the database. No email fallbacks.
+  const displayName = username;
 
   return (
     <nav className="bg-black z-50 border-b border-white/5">
@@ -53,9 +54,14 @@ export function NavBar({ initialUser, initialUsername }: NavBarProps) {
         {/* Left: Brand */}
         <div className="flex-1">
           <Link href="/" className="group inline-block">
-            <span className="font-black text-xl tracking-tighter uppercase italic text-slate-200 group-hover:text-emerald-500 transition-colors">
-              Shot Caller
-            </span>
+            <div className="flex items-center gap-2 group-hover:scale-105 transition-transform duration-300">
+              <span className="font-black text-2xl tracking-tighter uppercase italic text-white">
+                Shot
+              </span>
+              <span className="font-black text-2xl tracking-tighter uppercase italic text-transparent bg-clip-text bg-gradient-to-br from-emerald-400 to-emerald-600 drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]">
+                Caller
+              </span>
+            </div>
           </Link>
         </div>
 
@@ -79,7 +85,7 @@ export function NavBar({ initialUser, initialUsername }: NavBarProps) {
           </Link>
         </div>
 
-        {/* Right: Auth Actions - Now instant because of server-side data */}
+        {/* Right: Auth Actions */}
         <div className="flex-1 flex justify-end">
           <div className="min-w-[120px] flex justify-end">
             {user ? (
@@ -90,9 +96,13 @@ export function NavBar({ initialUser, initialUsername }: NavBarProps) {
                 >
                   Create Market
                 </Link>
-                <Link href={`/profile/${username || user?.email?.split('@')[0]}`} className="flex items-center group/badge">
-                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-500 bg-emerald-500/10 px-4 py-2 rounded-full border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)] transition-all group-hover/badge:bg-emerald-500/20 group-hover/badge:border-emerald-500/40">
-                    @{displayName}
+                <Link href={username ? `/profile/${username}` : '/onboarding'} className="flex items-center group/badge">
+                  <span className={`text-[10px] font-black uppercase tracking-[0.25em] px-4 py-2 rounded-full border transition-all ${
+                    displayName 
+                      ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)] group-hover/badge:bg-emerald-500/20' 
+                      : 'text-rose-500 bg-rose-500/10 border-rose-500/20 animate-pulse'
+                  }`}>
+                    {displayName ? `@${displayName}` : 'CLAIM HANDLE'}
                   </span>
                 </Link>
               </div>

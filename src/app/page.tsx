@@ -1,213 +1,110 @@
 import { createClient } from '@/utils/supabase/server';
-import { MarketChart } from '@/components/MarketChart';
-import { BettingCard } from '@/components/BettingCard';
 import Link from 'next/link';
-import { TrendingUp, Users, PlusCircle, MessageSquare, Trash2 } from 'lucide-react';
-import { getCpmmProbability, formatProbability } from '@/lib/engine/cpmm';
-import { deleteMarketAction, resolveMarketAction } from '@/app/actions/market';
-import { CheckCircle2, XCircle } from 'lucide-react';
-import { RealtimePulse } from '@/components/RealtimePulse';
+import { TrendingUp, Users, PlusCircle } from 'lucide-react';
+import { getMultiProbability, formatProbability } from '@/lib/engine/cpmm';
 
 export const revalidate = 0; // Disable cache for live data
 
 export default async function Home() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
-  // 1. Fetch all open markets
+  // 1. Fetch all open markets with their options
   const { data: markets, error: marketError } = await supabase
     .from('markets')
-    .select('*')
+    .select('*, answers(*)')
     .eq('status', 'open')
     .order('created_at', { ascending: false });
 
   if (marketError || !markets || markets.length === 0) {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8">
-        <h1 className="text-2xl font-bold mb-4">No active markets found.</h1>
-        <Link href="/create" className="flex items-center gap-2 bg-emerald-500 px-6 py-3 rounded-xl font-bold hover:bg-emerald-400 transition-colors text-black">
-          <PlusCircle className="w-5 h-5" /> Create First Market
+        <h1 className="text-2xl font-bold mb-4 italic uppercase tracking-tighter text-slate-500">No active shots to call.</h1>
+        <Link href="/create" className="flex items-center gap-2 bg-emerald-500 px-8 py-4 rounded-2xl font-black hover:bg-emerald-400 transition-all text-black uppercase tracking-widest active:scale-95 shadow-2xl shadow-emerald-500/20">
+          <PlusCircle className="w-6 h-6" /> Create First Market
         </Link>
       </div>
     );
   }
 
-  const featuredMarket = markets[0];
-
-  // 2. Fetch history for the featured market
-  const { data: history } = await supabase
-    .from('bets')
-    .select('created_at, probability_at_bet, amount, outcome, comment, user_id')
-    .eq('market_id', featuredMarket.id)
-    .order('created_at', { ascending: true });
-
-  const chartData = [
-    { created_at: featuredMarket.created_at, probability: parseFloat(featuredMarket.p) },
-    ...(history?.map(h => ({ created_at: h.created_at, probability: parseFloat(h.probability_at_bet) })) || [])
-  ];
-
-  const featuredVolume = history?.reduce((acc, b) => acc + parseFloat(b.amount), 0) || 0;
-
   return (
     <main className="min-h-screen bg-black text-white p-8 font-sans selection:bg-emerald-500/30 pb-32">
-      <RealtimePulse marketId={featuredMarket.id} />
       <div className="max-w-6xl mx-auto">
         
-        {/* RESTORED BOLD HEADER */}
-        <header className="mb-16 flex justify-between items-end border-b border-white/10 pb-12">
-          <div className="flex-1">
-            <div className="text-emerald-500 font-black tracking-tighter text-sm uppercase mb-3 italic">
-              Live Market
-            </div>
-            <h1 className="text-6xl font-black tracking-tighter leading-[0.9] mb-4 max-w-4xl text-balance">
-              {featuredMarket.question}
-            </h1>
-            {featuredMarket.creator_id === user?.id && featuredVolume === 0 && (
-              <form action={deleteMarketAction.bind(null, featuredMarket.id)}>
-                <button className="flex items-center gap-2 text-rose-500 hover:text-rose-400 text-[10px] font-black uppercase tracking-widest transition-colors mb-4">
-                  <Trash2 className="w-3 h-3" /> Delete Market
-                </button>
-              </form>
-            )}
-            {featuredMarket.description && (
-              <p className="text-slate-400 text-xl max-w-2xl font-medium">
-                {featuredMarket.description}
-              </p>
-            )}
+        {/* HERO HEADER */}
+        <header className="mb-20">
+          <div className="text-emerald-500 font-black tracking-tighter text-sm uppercase mb-3 italic">
+            Live Feed
           </div>
-          <div className="text-right shrink-0">
-            <div className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-balance">Total Volume</div>
-            <div className="text-4xl font-mono font-black text-white whitespace-nowrap">{featuredVolume.toFixed(1)} SHOTS</div>
+          <div className="flex justify-between items-end gap-12 border-b border-white/10 pb-12">
+            <h1 className="text-8xl font-black tracking-tighter leading-[0.85] italic max-w-2xl">
+              ACTIVE MARKETS
+            </h1>
+            <div className="text-right pb-2">
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Got a theory?</p>
+              <Link href="/create" className="bg-white hover:bg-emerald-500 hover:text-black text-black font-black px-6 py-3 rounded-full text-[10px] uppercase tracking-widest transition-all">
+                + Launch Market
+              </Link>
+            </div>
           </div>
         </header>
 
-        {/* MAIN GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start mb-24">
-          <div className="lg:col-span-2 space-y-12">
-            <div className="bg-slate-900/40 border border-white/5 rounded-[2rem] p-10 backdrop-blur-xl shadow-2xl">
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Market Probability</h2>
-                <div className="text-[10px] font-bold text-slate-700 uppercase tracking-widest">Real-time Feed</div>
-              </div>
-              <MarketChart history={chartData} />
-            </div>
+        {/* MARKET GRID */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {markets.map((m) => {
+            const answers = m.answers || [];
+            const firstAnswer = answers[0];
+            const pool: any = {};
+            answers.forEach((a: any) => pool[a.id] = parseFloat(a.pool));
+            const prob = firstAnswer ? getMultiProbability(pool, firstAnswer.id) : 0.5;
 
-            {/* RECENT ACTIVITY / TRASH TALK */}
-            <div className="space-y-6">
-              <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 flex items-center gap-2">
-                <MessageSquare className="w-3 h-3" /> Recent Activity
-              </h2>
-              <div className="space-y-3">
-                {history && history.length > 0 ? (
-                  history.slice().reverse().map((bet, idx) => (
-                    <div key={idx} className="bg-white/5 border border-white/5 p-6 rounded-2xl flex flex-col gap-2">
-                      <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                        <span className={bet.outcome === 'YES' ? 'text-emerald-400' : 'text-rose-400'}>
-                          {bet.outcome} {parseFloat(bet.amount).toFixed(1)} SHOTS
-                        </span>
-                        <span className="text-slate-600">
-                          {new Date(bet.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      {bet.comment && (
-                        <p className="text-slate-300 text-sm italic font-medium leading-relaxed">
-                          &quot;{bet.comment}&quot;
-                        </p>
-                      )}
+            return (
+              <Link 
+                key={m.id} 
+                href={`/markets/${m.id}`}
+                className="group relative bg-slate-900/40 border border-white/5 p-10 rounded-[3rem] hover:bg-slate-900/60 hover:border-emerald-500/30 transition-all duration-500 shadow-2xl flex flex-col justify-between min-h-[320px]"
+              >
+                {/* Decorative Accent */}
+                <div className="absolute top-0 left-12 w-12 h-[2px] bg-emerald-500/50 group-hover:w-24 transition-all duration-500" />
+                
+                <div>
+                  <div className="flex justify-between items-start gap-6 mb-8">
+                    <h3 className="font-black text-3xl tracking-tight leading-[0.95] group-hover:text-emerald-400 transition-colors text-balance">
+                      {m.question}
+                    </h3>
+                  </div>
+                  
+                  {/* Probability Bar */}
+                  <div className="space-y-3 mb-8">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      <span>{firstAnswer?.text || 'YES'}</span>
+                      <span className="text-emerald-500">{formatProbability(prob)}</span>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-slate-700 text-xs uppercase font-black tracking-widest text-center py-8">
-                    No bets yet. Be the first.
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-1000" 
+                        style={{ width: `${prob * 100}%` }}
+                      />
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
+                </div>
 
-          <div className="flex flex-col gap-8 sticky top-32">
-            {/* RESOLUTION CONTROLS (For Creator) */}
-            {featuredMarket.creator_id === user?.id && (
-              <div className="bg-slate-900 border border-emerald-500/20 p-8 rounded-[2rem] shadow-2xl">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 mb-6">Settlement Control</h3>
-                <form action={resolveMarketAction} className="space-y-4">
-                  <input type="hidden" name="marketId" value={featuredMarket.id} />
-                  <textarea 
-                    name="reason"
-                    required
-                    placeholder="Provide proof or reason..."
-                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder:text-slate-800 resize-none mb-2"
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <button 
-                      name="outcome"
-                      value="resolved_yes"
-                      className="bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <CheckCircle2 className="w-4 h-4" /> Resolve YES
-                    </button>
-                    <button 
-                      name="outcome"
-                      value="resolved_no"
-                      className="bg-rose-500 hover:bg-rose-400 text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <XCircle className="w-4 h-4" /> Resolve NO
-                    </button>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-6 text-[9px] text-slate-600 font-black uppercase tracking-[0.2em]">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-3 h-3 text-slate-800" /> {answers.length} Options
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-3 h-3 text-slate-800" /> Live
+                    </div>
                   </div>
-                </form>
-              </div>
-            )}
-
-            <BettingCard 
-              marketId={featuredMarket.id}
-              userId={user?.id || null}
-              initialPool={{ YES: parseFloat(featuredMarket.yes_pool), NO: parseFloat(featuredMarket.no_pool) }}
-              p={parseFloat(featuredMarket.p)}
-            />
-          </div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                    Bet Now →
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
-
-        {/* SUBTLE DISCOVERY SECTION */}
-        {markets.length > 1 && (
-          <section className="border-t border-white/5 pt-20">
-            <div className="flex justify-between items-end mb-12">
-              <div>
-                <h2 className="text-4xl font-black tracking-tighter mb-2">Other Markets</h2>
-                <p className="text-slate-500 font-medium text-balance">Browse active group bets.</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {markets.slice(1).map((m) => {
-                const prob = getCpmmProbability({ YES: parseFloat(m.yes_pool), NO: parseFloat(m.no_pool) }, parseFloat(m.p));
-                return (
-                  <Link 
-                    key={m.id} 
-                    href={`/markets/${m.id}`}
-                    className="group bg-white/5 border border-white/5 p-8 rounded-[2rem] hover:bg-white/10 hover:border-emerald-500/50 transition-all shadow-xl"
-                  >
-                    <div className="flex justify-between items-start gap-6 mb-6">
-                      <h3 className="font-black text-2xl tracking-tight leading-none group-hover:text-emerald-400 transition-colors text-balance">
-                        {m.question}
-                      </h3>
-                      <div className="text-3xl font-black font-mono text-emerald-500 italic">
-                        {formatProbability(prob)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-6 text-[10px] text-slate-600 font-black uppercase tracking-widest">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-3 h-3" /> Traders
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-3 h-3" /> {(parseFloat(m.yes_pool) + parseFloat(m.no_pool) - 200).toFixed(1)} Volume
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        )}
       </div>
     </main>
   );

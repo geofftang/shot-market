@@ -7,6 +7,7 @@ import { deleteMarketAction, resolveMarketAction } from '@/app/actions/market';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { RealtimePulse } from '@/components/RealtimePulse';
+import { SettlementUtility } from '@/components/SettlementUtility';
 
 export const revalidate = 0; // Disable cache for live data
 
@@ -19,10 +20,10 @@ export default async function MarketPage({ params }: PageProps) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // 1. Fetch the specific market
+  // 1. Fetch the specific market with its options
   const { data: market, error: marketError } = await supabase
     .from('markets')
-    .select('*')
+    .select('*, answers(*)')
     .eq('id', marketId)
     .single();
 
@@ -30,16 +31,22 @@ export default async function MarketPage({ params }: PageProps) {
     return notFound();
   }
 
+  const answers = market.answers || [];
+
   // 2. Fetch history for this market
   const { data: history } = await supabase
     .from('bets')
-    .select('created_at, probability_at_bet, amount, outcome, comment, user_id')
+    .select('created_at, probability_at_bet, amount, outcome, comment, user_id, answer_id')
     .eq('market_id', market.id)
     .order('created_at', { ascending: true });
 
+  const firstAnswerId = answers[0]?.id;
   const chartData = [
-    { created_at: market.created_at, probability: parseFloat(market.p) },
-    ...(history?.map(h => ({ created_at: h.created_at, probability: parseFloat(h.probability_at_bet) })) || [])
+    { created_at: market.created_at, probability: 0.5 },
+    ...(history?.filter(h => h.answer_id === firstAnswerId).map(h => ({ 
+      created_at: h.created_at, 
+      probability: parseFloat(h.probability_at_bet) 
+    })) || [])
   ];
 
   const volume = history?.reduce((acc, b) => acc + parseFloat(b.amount), 0) || 0;
@@ -126,54 +133,29 @@ export default async function MarketPage({ params }: PageProps) {
           </div>
 
           <div className="flex flex-col gap-8 sticky top-32">
-            {/* RESOLUTION CONTROLS (For Creator) */}
-            {market.creator_id === user?.id && market.status === 'open' && (
-              <div className="bg-slate-900 border border-emerald-500/20 p-8 rounded-[2rem] shadow-2xl">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 mb-6">Settlement Control</h3>
-                <form action={resolveMarketAction} className="space-y-4">
-                  <input type="hidden" name="marketId" value={market.id} />
-                  <textarea 
-                    name="reason"
-                    required
-                    placeholder="Provide proof or reason..."
-                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder:text-slate-800 resize-none mb-2"
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <button 
-                      name="outcome"
-                      value="resolved_yes"
-                      className="bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <CheckCircle2 className="w-4 h-4" /> Resolve YES
-                    </button>
-                    <button 
-                      name="outcome"
-                      value="resolved_no"
-                      className="bg-rose-500 hover:bg-rose-400 text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <XCircle className="w-4 h-4" /> Resolve NO
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
             {market.status === 'open' ? (
-              <BettingCard 
-                marketId={market.id}
-                userId={user?.id || null}
-                initialPool={{ YES: parseFloat(market.yes_pool), NO: parseFloat(market.no_pool) }}
-                p={parseFloat(market.p)}
-              />
+              <>
+                <BettingCard 
+                  marketId={market.id}
+                  userId={user?.id || null}
+                  answers={answers.map(a => ({ id: a.id, text: a.text, pool: parseFloat(a.pool) }))}
+                  outcomeType={market.outcome_type}
+                />
+
+                {/* DISCRETE SETTLEMENT CONTROLS (For Creator) */}
+                {market.creator_id === user?.id && (
+                  <SettlementUtility marketId={market.id} answers={answers.map(a => ({ id: a.id, text: a.text }))} />
+                )}
+              </>
             ) : (
               <div className="bg-slate-900 border border-white/5 p-8 rounded-[2rem] shadow-2xl text-center">
                 <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-4">
                   Market Closed
                 </div>
                 <div className={`text-2xl font-black italic uppercase tracking-tighter ${
-                  market.status === 'resolved_yes' ? 'text-emerald-500' : 'text-rose-500'
+                  answers.find(a => a.is_winner)?.text === 'YES' ? 'text-emerald-500' : 'text-rose-500'
                 }`}>
-                  Resolved {market.status === 'resolved_yes' ? 'YES' : 'NO'}
+                  Resolved {answers.find(a => a.is_winner)?.text || 'UNKNOWN'}
                 </div>
               </div>
             )}

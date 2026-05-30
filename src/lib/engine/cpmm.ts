@@ -1,58 +1,73 @@
 /**
- * CORE CPMM ENGINE
- * Adapted from Manifold Markets (common/src/calculate-cpmm.ts)
+ * MULTI-OUTCOME CPMM ENGINE (Maniswap)
  * 
- * This engine handles the math for a Constant Product Market Maker (CPMM)
- * specifically using the invariant: y^p * n^(1-p) = k
+ * Supports N mutually exclusive outcomes.
+ * Invariant: Product(pools) = k
+ * Probability P_i = (1/pool_i) / Sum(1/pool_j)
  */
 
-export type BinaryPool = {
-  YES: number;
-  NO: number;
-};
+export type MultiPool = Record<string, number>;
 
 /**
- * Calculates the probability (price) of the YES outcome.
+ * Calculates the probability (price) of a specific outcome.
+ * P_i = (1/s_i) / Sum(1/s_j)
  */
-export function getCpmmProbability(pool: BinaryPool, p: number): number {
-  const { YES, NO } = pool;
-  return (p * YES) / (p * YES + (1 - p) * NO);
+export function getMultiProbability(pool: MultiPool, answerId: string): number {
+  const ids = Object.keys(pool);
+  const inverseSum = ids.reduce((acc, id) => acc + 1 / pool[id], 0);
+  return (1 / pool[answerId]) / inverseSum;
 }
 
 /**
- * Calculates the shares received for a given bet amount.
- * amount: Amount of "Shots" to bet
- * outcome: 'YES' or 'NO'
+ * Calculates all probabilities for a pool.
  */
-export function calculateCpmmPurchase(
-  pool: BinaryPool,
-  p: number,
-  amount: number,
-  outcome: 'YES' | 'NO'
+export function getMultiProbabilities(pool: MultiPool): Record<string, number> {
+  const ids = Object.keys(pool);
+  const inverseSum = ids.reduce((acc, id) => acc + 1 / pool[id], 0);
+  const probs: Record<string, number> = {};
+  ids.forEach(id => {
+    probs[id] = (1 / pool[id]) / inverseSum;
+  });
+  return probs;
+}
+
+/**
+ * Calculates the shares received for a given bet amount on a specific answer.
+ * amount: Amount of "Shots" to bet
+ */
+export function calculateMultiPurchase(
+  pool: MultiPool,
+  answerId: string,
+  amount: number
 ): {
   shares: number;
-  newPool: BinaryPool;
+  newPool: MultiPool;
 } {
-  const { YES, NO } = pool;
-  const k = Math.pow(YES, p) * Math.pow(NO, 1 - p);
+  const ids = Object.keys(pool);
+  const k = ids.reduce((acc, id) => acc * pool[id], 1);
 
-  if (outcome === 'YES') {
-    const newYES = YES + amount;
-    const newNO = Math.pow(k / Math.pow(newYES, p), 1 / (1 - p));
-    const shares = NO - newNO + amount;
-    return {
-      shares,
-      newPool: { YES: newYES, NO: newNO },
-    };
-  } else {
-    const newNO = NO + amount;
-    const newYES = Math.pow(k / Math.pow(newNO, 1 - p), 1 / p);
-    const shares = YES - newYES + amount;
-    return {
-      shares,
-      newPool: { YES: newYES, NO: newNO },
-    };
-  }
+  // 1. New pools for all other outcomes increase by the bet amount
+  const newPool: MultiPool = { ...pool };
+  ids.forEach(id => {
+    if (id !== answerId) {
+      newPool[id] = pool[id] + amount;
+    }
+  });
+
+  // 2. New pool for the chosen outcome is recalculated to maintain k
+  const otherProduct = ids
+    .filter(id => id !== answerId)
+    .reduce((acc, id) => acc * newPool[id], 1);
+  
+  newPool[answerId] = k / otherProduct;
+
+  // 3. Shares received = (original inventory + bet) - new inventory
+  const shares = (pool[answerId] + amount) - newPool[answerId];
+
+  return {
+    shares,
+    newPool,
+  };
 }
 
 /**

@@ -19,7 +19,8 @@ async function seed() {
     .upsert({ 
       id: '00000000-0000-0000-0000-000000000000', 
       username: 'system', 
-      credits: 0 
+      credits: 0,
+      weight: 1.0
     });
 
   if (profileError) {
@@ -29,24 +30,48 @@ async function seed() {
   console.log('✅ System profile created.');
 
   // 2. Create the David vs Shaun Market
-  const { error: marketError } = await supabase
+  const { data: market, error: marketError } = await supabase
     .from('markets')
     .upsert({
       id: '11111111-1111-1111-1111-111111111111',
       question: "Will David answer Shaun's phone call?",
-      description: "",
+      description: "Shaun is calling David 3 times. David usually ignores Shaun when he is gaming.",
       creator_id: '00000000-0000-0000-0000-000000000000',
-      yes_pool: 50,
-      no_pool: 50,
-      p: 0.5,
+      outcome_type: 'binary',
       status: 'open'
-    });
+    })
+    .select()
+    .single();
 
-  if (marketError) {
-    console.error('❌ Error creating market:', marketError.message);
+  if (marketError || !market) {
+    console.error('❌ Error creating market:', marketError?.message);
     return;
   }
   console.log('✅ David vs Shaun market created.');
+
+  // 3. Create Answers for the market
+  const { error: answersError } = await supabase
+    .from('answers')
+    .upsert([
+      { 
+        id: '22222222-2222-2222-2222-222222222222',
+        market_id: market.id, 
+        text: 'YES', 
+        pool: 50 
+      },
+      { 
+        id: '33333333-3333-3333-3333-333333333333',
+        market_id: market.id, 
+        text: 'NO', 
+        pool: 50 
+      }
+    ]);
+
+  if (answersError) {
+    console.error('❌ Error creating answers:', answersError.message);
+    return;
+  }
+  console.log('✅ Default answers (YES/NO) created.');
 
   console.log('\n🚀 SEEDING COMPLETE. Refresh http://localhost:3000 to see the live market!');
 }

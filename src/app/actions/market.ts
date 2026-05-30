@@ -17,23 +17,44 @@ export async function createMarketAction(formData: FormData) {
   
   const question = formData.get('question') as string;
   const description = formData.get('description') as string;
-  const initialLiquidity = parseFloat(formData.get('initialLiquidity') as string) || 50;
+  const outcomeType = formData.get('outcomeType') as 'binary' | 'multiple';
+  const initialLiquidity = 50;
 
   if (!question) throw new Error('Question is required');
 
-  const { error } = await supabase
+  // 1. Create Market
+  const { data: market, error: marketError } = await supabase
     .from('markets')
     .insert({
       question,
       description,
       creator_id: user.id,
-      yes_pool: initialLiquidity,
-      no_pool: initialLiquidity,
-      p: 0.5,
+      outcome_type: outcomeType,
       status: 'open'
-    });
+    })
+    .select()
+    .single();
 
-  if (error) throw new Error(error.message);
+  if (marketError) throw new Error(marketError.message);
+
+  // 2. Create Answers
+  if (outcomeType === 'binary') {
+    await supabase.from('answers').insert([
+      { market_id: market.id, text: 'YES', pool: initialLiquidity },
+      { market_id: market.id, text: 'NO', pool: initialLiquidity }
+    ]);
+  } else {
+    const rawAnswers = formData.getAll('answers') as string[];
+    const answers = rawAnswers.filter(a => a.trim().length > 0);
+    if (answers.length < 2) throw new Error('At least 2 options are required for multiple choice');
+
+    const answersToInsert = answers.map(text => ({
+      market_id: market.id,
+      text,
+      pool: initialLiquidity
+    }));
+    await supabase.from('answers').insert(answersToInsert);
+  }
 
   revalidatePath('/');
   redirect('/');
@@ -65,10 +86,10 @@ export async function resolveMarketAction(formData: FormData) {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   
   const marketId = formData.get('marketId') as string;
-  const outcome = formData.get('outcome') as 'resolved_yes' | 'resolved_no';
+  const winnerId = formData.get('winnerId') as string; // ID of the winning answer
   const reason = formData.get('reason') as string;
 
-  if (!marketId || !outcome || !reason) throw new Error('Market ID, outcome, and reason are required');
+  if (!marketId || !winnerId || !reason) throw new Error('Market ID, winning answer, and reason are required');
 
   // 1. Verify ownership
   const { data: market, error: marketError } = await supabase
@@ -82,12 +103,11 @@ export async function resolveMarketAction(formData: FormData) {
   if (market.status !== 'open') throw new Error('Market is already resolved');
 
   // 2. Fetch all winning bets
-  const winningOutcome = outcome === 'resolved_yes' ? 'YES' : 'NO';
   const { data: winningBets, error: betsError } = await supabase
     .from('bets')
     .select('user_id, shares')
     .eq('market_id', marketId)
-    .eq('outcome', winningOutcome);
+    .eq('answer_id', winnerId);
 
   if (betsError) throw new Error(betsError.message);
 
@@ -112,17 +132,19 @@ export async function resolveMarketAction(formData: FormData) {
     }
   }
 
-  // 4. Close market
+  // 4. Mark winner and close market
+  await supabase.from('answers').update({ is_winner: true }).eq('id', winnerId);
   await supabase
     .from('markets')
     .update({ 
-      status: outcome, 
+      status: 'resolved', 
       closed_at: new Date().toISOString(),
       description: market.description + `\n\nRESOLUTION: ${reason}` 
     })
     .eq('id', marketId);
 
   revalidatePath('/');
+  revalidatePath(`/markets/${marketId}`);
   revalidatePath('/leaderboard');
   redirect('/');
 }

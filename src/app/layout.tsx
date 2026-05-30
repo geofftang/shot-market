@@ -34,7 +34,9 @@ export default async function RootLayout({
       .select('username')
       .eq('id', user.id)
       .single();
-    initialUsername = profile?.username || user.email?.split('@')[0] || null;
+    
+    // NO EMAIL FALLBACKS. User must have an explicit username in the profiles table.
+    initialUsername = profile?.username || null;
   }
 
   return (
