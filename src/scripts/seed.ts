@@ -11,7 +11,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function seed() {
-  console.log('🌱 Seeding Shot Market data...');
+  console.log('🌱 Seeding Shot Caller data...');
 
   // 1. Create System Profile
   const { error: profileError } = await supabase
@@ -36,8 +36,8 @@ async function seed() {
       question: "Will David answer Shaun's phone call?",
       description: "",
       creator_id: '00000000-0000-0000-0000-000000000000',
-      yes_pool: 100,
-      no_pool: 100,
+      yes_pool: 50,
+      no_pool: 50,
       p: 0.5,
       status: 'open'
     });

@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { calculateCpmmPurchase, formatProbability, getCpmmProbability } from '@/lib/engine/cpmm';
 import { placeBetAction } from '@/app/actions/bet';
 import { TrendingUp, TrendingDown, Info } from 'lucide-react';
 
 interface BettingCardProps {
   marketId: string;
-  userId: string;
+  userId: string | null;
   initialPool: { YES: number; NO: number };
   p: number;
 }
@@ -16,20 +16,17 @@ export function BettingCard({ marketId, userId, initialPool, p }: BettingCardPro
   const [amount, setAmount] = useState<string>('5');
   const [outcome, setOutcome] = useState<'YES' | 'NO'>('YES');
   const [comment, setComment] = useState<string>('');
-  const [preview, setPreview] = useState<{ shares: number; newProb: number } | null>(null);
   const [isPending, setIsPending] = useState(false);
 
-  // Update preview whenever amount or outcome changes
-  useEffect(() => {
-    const numAmount = parseFloat(amount);
-    if (!isNaN(numAmount) && numAmount > 0) {
-      const { shares, newPool } = calculateCpmmPurchase(initialPool, p, numAmount, outcome);
-      const newProb = getCpmmProbability(newPool, p);
-      setPreview({ shares, newProb });
-    } else {
-      setPreview(null);
-    }
-  }, [amount, outcome, initialPool, p]);
+  // Derived state: calculate preview during render
+  const numAmount = parseFloat(amount);
+  const preview = !isNaN(numAmount) && numAmount > 0 
+    ? calculateCpmmPurchase(initialPool, p, numAmount, outcome)
+    : null;
+    
+  const newProb = preview 
+    ? getCpmmProbability(preview.newPool, p)
+    : null;
 
   const currentProb = getCpmmProbability(initialPool, p);
 
@@ -71,7 +68,15 @@ export function BettingCard({ marketId, userId, initialPool, p }: BettingCardPro
 
       {/* Amount Input */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-slate-400 mb-2">Amount (Shots)</label>
+        <div className="flex justify-between items-center mb-2">
+          <label className="block text-sm font-medium text-slate-400">Amount (Shots)</label>
+          <div className="group relative">
+            <Info className="w-3 h-3 text-slate-600 cursor-help" />
+            <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-slate-800 text-[10px] text-slate-300 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-white/5 shadow-2xl">
+              1 Shot moves the market the same for everyone, but costs you real drinks based on your personal weight.
+            </div>
+          </div>
+        </div>
         <div className="relative">
           <input
             type="number"
@@ -115,37 +120,46 @@ export function BettingCard({ marketId, userId, initialPool, p }: BettingCardPro
               <TrendingDown className="w-3 h-3" /> New Probability
             </span>
             <span className="text-slate-300 font-mono">
-              {formatProbability(preview.newProb)}
+              {newProb !== null ? formatProbability(newProb) : '-'}
             </span>
           </div>
         </div>
       )}
 
       {/* Submit Button */}
-      <form action={async (formData) => {
-        setIsPending(true);
-        try {
-          await placeBetAction(formData);
-          setComment(''); // Clear comment on success
-        } catch (e) {
-          alert(e instanceof Error ? e.message : 'Failed to place bet');
-        } finally {
-          setIsPending(false);
-        }
-      }}>
-        <input type="hidden" name="userId" value={userId} />
-        <input type="hidden" name="marketId" value={marketId} />
-        <input type="hidden" name="amount" value={amount} />
-        <input type="hidden" name="outcome" value={outcome} />
-        <input type="hidden" name="comment" value={comment} />
-        
-        <button
-          disabled={isPending || !amount || parseFloat(amount) <= 0}
-          className="w-full bg-white hover:bg-slate-200 text-slate-950 font-black py-4 rounded-xl shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+      {userId ? (
+        <form action={async (formData) => {
+          setIsPending(true);
+          try {
+            await placeBetAction(formData);
+            setComment(''); // Clear comment on success
+          } catch (e) {
+            alert(e instanceof Error ? e.message : 'Failed to place bet');
+          } finally {
+            setIsPending(false);
+          }
+        }}>
+          <input type="hidden" name="userId" value={userId} />
+          <input type="hidden" name="marketId" value={marketId} />
+          <input type="hidden" name="amount" value={amount} />
+          <input type="hidden" name="outcome" value={outcome} />
+          <input type="hidden" name="comment" value={comment} />
+          
+          <button
+            disabled={isPending || !amount || parseFloat(amount) <= 0}
+            className="w-full bg-white hover:bg-slate-200 text-slate-950 font-black py-4 rounded-xl shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {isPending ? 'PLACING BET...' : 'CONFIRM BET'}
+          </button>
+        </form>
+      ) : (
+        <a
+          href="/login"
+          className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-4 rounded-xl shadow-xl transition-all active:scale-95 flex items-center justify-center"
         >
-          {isPending ? 'PLACING BET...' : 'CONFIRM BET'}
-        </button>
-      </form>
+          SIGN IN TO BET
+        </a>
+      )}
 
       <p className="mt-4 text-[10px] text-slate-600 flex items-center gap-1 justify-center uppercase tracking-widest">
         <Info className="w-3 h-3" /> Trades are final. Drink responsibly.

@@ -38,8 +38,8 @@ export async function updateSession(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    // If profile exists but username is still an email or placeholder, redirect
-    if (profile && (!profile.username || profile.username.includes('@'))) {
+    // Redirect if no profile exists, or if username is missing/invalid
+    if (!profile || !profile.username || profile.username.includes('@')) {
       const url = request.nextUrl.clone()
       url.pathname = '/onboarding'
       return NextResponse.redirect(url)

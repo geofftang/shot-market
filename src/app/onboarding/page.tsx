@@ -16,14 +16,14 @@ export default function OnboardingPage() {
           <div className="bg-emerald-500 p-2 rounded-xl">
             <Beer className="w-6 h-6 text-black" />
           </div>
-          <h1 className="text-3xl font-black tracking-tighter uppercase italic">Shot Market</h1>
+          <h1 className="text-3xl font-black tracking-tighter uppercase italic">Shot Caller</h1>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 p-10 rounded-[2rem] shadow-2xl">
           <header className="mb-10 text-center">
             <h2 className="text-2xl font-black tracking-tight mb-2">Claim Your Name</h2>
             <p className="text-slate-500 text-sm font-medium leading-relaxed">
-              This is how you'll appear on the Board of Shame. Choose wisely.
+              This is how you&apos;ll appear on the Board of Shame. Choose wisely.
             </p>
           </header>
 
@@ -51,7 +51,7 @@ export default function OnboardingPage() {
                   minLength={3}
                   maxLength={15}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl py-4 pl-12 pr-4 text-center text-xl font-black text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-slate-800"
-                  placeholder="degen_king"
+                  placeholder="shot_caller"
                 />
               </div>
             </div>

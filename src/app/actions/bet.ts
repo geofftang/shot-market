@@ -1,13 +1,20 @@
 'use server'
 
+import { createClient as createServerClient } from '@/utils/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import { calculateCpmmPurchase, getCpmmProbability } from '@/lib/engine/cpmm';
 import { revalidatePath } from 'next/cache';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!; // Use service role for server actions
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function placeBetAction(formData: FormData) {
+  // 1. Verify Authentication
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  
+  if (!user) throw new Error('You must be logged in to bet');
+
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   
   const userId = formData.get('userId') as string;
@@ -16,11 +23,27 @@ export async function placeBetAction(formData: FormData) {
   const outcome = formData.get('outcome') as 'YES' | 'NO';
   const comment = formData.get('comment') as string;
 
-  if (!userId || !marketId || isNaN(amount) || amount <= 0) {
+  if (user.id !== userId) throw new Error('Identity verification failed');
+  if (!marketId || isNaN(amount) || amount <= 0) {
     throw new Error('Invalid bet parameters');
   }
 
-  // 1. Fetch current market state
+  // 2. Profile Insurance: Ensure the user has a profile record
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile) {
+    await supabase.from('profiles').insert({
+      id: user.id,
+      username: user.email?.split('@')[0] || 'anonymous',
+      credits: 0
+    });
+  }
+
+  // 3. Fetch current market state
   const { data: market, error: marketError } = await supabase
     .from('markets')
     .select('*')
@@ -50,9 +73,14 @@ export async function placeBetAction(formData: FormData) {
     p_comment: comment || null
   });
 
-  if (rpcError) throw new Error(rpcError.message);
+  if (rpcError) {
+    console.error('RPC Error placing bet:', rpcError);
+    throw new Error(rpcError.message);
+  }
 
-  // 4. Update the UI
+  // 4. Update the UI (Both home and detail page)
+  revalidatePath('/');
   revalidatePath(`/markets/${marketId}`);
+  
   return { success: true };
 }

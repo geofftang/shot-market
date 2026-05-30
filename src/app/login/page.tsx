@@ -17,17 +17,24 @@ export default function LoginPage() {
     setLoading(true);
     setMessage(null);
 
+    const cleanEmail = email.trim().toLowerCase();
+
     const { error } = await supabase.auth.signInWithOtp({
-      email,
+      email: cleanEmail,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 
     if (error) {
-      setMessage({ text: error.message, type: 'error' });
+      console.error('Supabase Auth Error:', error);
+      let errorText = error.message;
+      if (errorText.includes('Unsupported provider') || error.status === 400) {
+        errorText = "Login failed. Please ensure 'Email' provider and 'Confirm Email' are enabled in your Supabase Dashboard.";
+      }
+      setMessage({ text: errorText, type: 'error' });
     } else {
-      setMessage({ text: "Magic link sent! Check your inbox to sign in.", type: 'success' });
+      setMessage({ text: "Magic link sent! Check your inbox.", type: 'success' });
     }
     setLoading(false);
   };
@@ -43,14 +50,14 @@ export default function LoginPage() {
           <div className="bg-emerald-500 p-2 rounded-xl">
             <Beer className="w-6 h-6 text-black" />
           </div>
-          <h1 className="text-3xl font-black tracking-tighter uppercase italic">Shot Market</h1>
+          <h1 className="text-3xl font-black tracking-tighter uppercase italic">Shot Caller</h1>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 p-10 rounded-[2rem] shadow-2xl">
           <header className="mb-10">
             <h2 className="text-2xl font-black tracking-tight mb-2">Passwordless Login</h2>
             <p className="text-slate-500 text-sm font-medium leading-relaxed">
-              We'll send a magic link to your inbox. No passwords required.
+              We&apos;ll send a magic link to your inbox. No passwords required.
             </p>
           </header>
 

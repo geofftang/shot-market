@@ -1,11 +1,12 @@
--- SHOT MARKET DATABASE SCHEMA
+-- SHOT CALLER DATABASE SCHEMA
 
 -- 1. PROFILES
 -- Tracks user shot-credits (accountability score)
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY, -- Removed foreign key for flexibility
   username TEXT UNIQUE NOT NULL,
-  credits NUMERIC DEFAULT 0, -- Can be negative
+  credits NUMERIC DEFAULT 0, -- Can be negative (Shot Debt)
+  weight NUMERIC DEFAULT 1.0, -- Personal multiplier: 1 Unit = X Shots
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -16,8 +17,8 @@ CREATE TABLE IF NOT EXISTS markets (
   creator_id UUID REFERENCES profiles(id) NOT NULL,
   question TEXT NOT NULL,
   description TEXT,
-  yes_pool NUMERIC DEFAULT 100, -- Initial "liquidity"
-  no_pool NUMERIC DEFAULT 100,
+  yes_pool NUMERIC DEFAULT 50, -- Initial "liquidity"
+  no_pool NUMERIC DEFAULT 50,
   p NUMERIC DEFAULT 0.5, -- Initial probability (Manifold CPMM p)
   status TEXT DEFAULT 'open' CHECK (status IN ('open', 'resolved_yes', 'resolved_no', 'cancelled')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -38,7 +39,33 @@ CREATE TABLE IF NOT EXISTS bets (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. RPC FUNCTIONS (Atomic Transactions)
+-- 4. SETTLEMENTS
+-- Track when users "pay back" their debt
+CREATE TABLE IF NOT EXISTS settlements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) NOT NULL,
+  amount NUMERIC NOT NULL, -- Shots paid back
+  comment TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. RPC FUNCTIONS & TRIGGERS
+
+/**
+ * Trigger to create a profile on signup
+ */
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, username, credits)
+  VALUES (new.id, new.email, 0);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 /**
  * Executes a bet atomically.

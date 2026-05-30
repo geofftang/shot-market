@@ -2,82 +2,82 @@ import { createClient } from '@/utils/supabase/server';
 import { MarketChart } from '@/components/MarketChart';
 import { BettingCard } from '@/components/BettingCard';
 import Link from 'next/link';
-import { TrendingUp, Users, PlusCircle, MessageSquare, Trash2 } from 'lucide-react';
-import { getCpmmProbability, formatProbability } from '@/lib/engine/cpmm';
+import { MessageSquare, Trash2, ArrowLeft } from 'lucide-react';
 import { deleteMarketAction, resolveMarketAction } from '@/app/actions/market';
 import { CheckCircle2, XCircle } from 'lucide-react';
+import { notFound } from 'next/navigation';
 import { RealtimePulse } from '@/components/RealtimePulse';
 
 export const revalidate = 0; // Disable cache for live data
 
-export default async function Home() {
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function MarketPage({ params }: PageProps) {
+  const { id: marketId } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // 1. Fetch all open markets
-  const { data: markets, error: marketError } = await supabase
+  // 1. Fetch the specific market
+  const { data: market, error: marketError } = await supabase
     .from('markets')
     .select('*')
-    .eq('status', 'open')
-    .order('created_at', { ascending: false });
+    .eq('id', marketId)
+    .single();
 
-  if (marketError || !markets || markets.length === 0) {
-    return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8">
-        <h1 className="text-2xl font-bold mb-4">No active markets found.</h1>
-        <Link href="/create" className="flex items-center gap-2 bg-emerald-500 px-6 py-3 rounded-xl font-bold hover:bg-emerald-400 transition-colors text-black">
-          <PlusCircle className="w-5 h-5" /> Create First Market
-        </Link>
-      </div>
-    );
+  if (marketError || !market) {
+    return notFound();
   }
 
-  const featuredMarket = markets[0];
-
-  // 2. Fetch history for the featured market
+  // 2. Fetch history for this market
   const { data: history } = await supabase
     .from('bets')
     .select('created_at, probability_at_bet, amount, outcome, comment, user_id')
-    .eq('market_id', featuredMarket.id)
+    .eq('market_id', market.id)
     .order('created_at', { ascending: true });
 
   const chartData = [
-    { created_at: featuredMarket.created_at, probability: parseFloat(featuredMarket.p) },
+    { created_at: market.created_at, probability: parseFloat(market.p) },
     ...(history?.map(h => ({ created_at: h.created_at, probability: parseFloat(h.probability_at_bet) })) || [])
   ];
 
-  const featuredVolume = history?.reduce((acc, b) => acc + parseFloat(b.amount), 0) || 0;
+  const volume = history?.reduce((acc, b) => acc + parseFloat(b.amount), 0) || 0;
 
   return (
     <main className="min-h-screen bg-black text-white p-8 font-sans selection:bg-emerald-500/30 pb-32">
-      <RealtimePulse marketId={featuredMarket.id} />
+      <RealtimePulse marketId={market.id} />
       <div className="max-w-6xl mx-auto">
         
-        {/* RESTORED BOLD HEADER */}
+        <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-white transition-colors mb-12 uppercase text-[10px] font-black tracking-widest">
+          <ArrowLeft className="w-4 h-4" /> Back to Markets
+        </Link>
+
+        {/* BOLD HEADER */}
         <header className="mb-16 flex justify-between items-end border-b border-white/10 pb-12">
           <div className="flex-1">
             <div className="text-emerald-500 font-black tracking-tighter text-sm uppercase mb-3 italic">
-              Live Market
+              {market.status === 'open' ? 'Live Market' : 'Resolved Market'}
             </div>
             <h1 className="text-6xl font-black tracking-tighter leading-[0.9] mb-4 max-w-4xl text-balance">
-              {featuredMarket.question}
+              {market.question}
             </h1>
-            {featuredMarket.creator_id === user?.id && featuredVolume === 0 && (
-              <form action={deleteMarketAction.bind(null, featuredMarket.id)}>
+            {market.creator_id === user?.id && volume === 0 && market.status === 'open' && (
+              <form action={deleteMarketAction.bind(null, market.id)}>
                 <button className="flex items-center gap-2 text-rose-500 hover:text-rose-400 text-[10px] font-black uppercase tracking-widest transition-colors mb-4">
                   <Trash2 className="w-3 h-3" /> Delete Market
                 </button>
               </form>
             )}
-            {featuredMarket.description && (
+            {market.description && (
               <p className="text-slate-400 text-xl max-w-2xl font-medium">
-                {featuredMarket.description}
+                {market.description}
               </p>
             )}
           </div>
           <div className="text-right shrink-0">
             <div className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-balance">Total Volume</div>
-            <div className="text-4xl font-mono font-black text-white whitespace-nowrap">{featuredVolume.toFixed(1)} SHOTS</div>
+            <div className="text-4xl font-mono font-black text-white whitespace-nowrap">{volume.toFixed(1)} SHOTS</div>
           </div>
         </header>
 
@@ -127,11 +127,11 @@ export default async function Home() {
 
           <div className="flex flex-col gap-8 sticky top-32">
             {/* RESOLUTION CONTROLS (For Creator) */}
-            {featuredMarket.creator_id === user?.id && (
+            {market.creator_id === user?.id && market.status === 'open' && (
               <div className="bg-slate-900 border border-emerald-500/20 p-8 rounded-[2rem] shadow-2xl">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 mb-6">Settlement Control</h3>
                 <form action={resolveMarketAction} className="space-y-4">
-                  <input type="hidden" name="marketId" value={featuredMarket.id} />
+                  <input type="hidden" name="marketId" value={market.id} />
                   <textarea 
                     name="reason"
                     required
@@ -158,56 +158,27 @@ export default async function Home() {
               </div>
             )}
 
-            <BettingCard 
-              marketId={featuredMarket.id}
-              userId={user?.id || null}
-              initialPool={{ YES: parseFloat(featuredMarket.yes_pool), NO: parseFloat(featuredMarket.no_pool) }}
-              p={parseFloat(featuredMarket.p)}
-            />
+            {market.status === 'open' ? (
+              <BettingCard 
+                marketId={market.id}
+                userId={user?.id || null}
+                initialPool={{ YES: parseFloat(market.yes_pool), NO: parseFloat(market.no_pool) }}
+                p={parseFloat(market.p)}
+              />
+            ) : (
+              <div className="bg-slate-900 border border-white/5 p-8 rounded-[2rem] shadow-2xl text-center">
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-4">
+                  Market Closed
+                </div>
+                <div className={`text-2xl font-black italic uppercase tracking-tighter ${
+                  market.status === 'resolved_yes' ? 'text-emerald-500' : 'text-rose-500'
+                }`}>
+                  Resolved {market.status === 'resolved_yes' ? 'YES' : 'NO'}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* SUBTLE DISCOVERY SECTION */}
-        {markets.length > 1 && (
-          <section className="border-t border-white/5 pt-20">
-            <div className="flex justify-between items-end mb-12">
-              <div>
-                <h2 className="text-4xl font-black tracking-tighter mb-2">Other Markets</h2>
-                <p className="text-slate-500 font-medium text-balance">Browse active group bets.</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {markets.slice(1).map((m) => {
-                const prob = getCpmmProbability({ YES: parseFloat(m.yes_pool), NO: parseFloat(m.no_pool) }, parseFloat(m.p));
-                return (
-                  <Link 
-                    key={m.id} 
-                    href={`/markets/${m.id}`}
-                    className="group bg-white/5 border border-white/5 p-8 rounded-[2rem] hover:bg-white/10 hover:border-emerald-500/50 transition-all shadow-xl"
-                  >
-                    <div className="flex justify-between items-start gap-6 mb-6">
-                      <h3 className="font-black text-2xl tracking-tight leading-none group-hover:text-emerald-400 transition-colors text-balance">
-                        {m.question}
-                      </h3>
-                      <div className="text-3xl font-black font-mono text-emerald-500 italic">
-                        {formatProbability(prob)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-6 text-[10px] text-slate-600 font-black uppercase tracking-widest">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-3 h-3" /> Traders
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-3 h-3" /> {(parseFloat(m.yes_pool) + parseFloat(m.no_pool) - 200).toFixed(1)} Volume
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        )}
       </div>
     </main>
   );

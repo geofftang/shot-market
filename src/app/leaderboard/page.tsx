@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Trophy, ArrowLeft, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowLeft, TrendingDown, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 
 export const revalidate = 0; // Live data
@@ -9,10 +9,38 @@ export default async function LeaderboardPage() {
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  const { data: profiles, error } = await supabase
+  const { data: profiles } = await supabase
     .from('profiles')
-    .select('*')
-    .order('credits', { ascending: false });
+    .select('*');
+
+  const { data: activeMarkets } = await supabase
+    .from('markets')
+    .select('id, yes_pool, no_pool, p')
+    .eq('status', 'open');
+
+  const { data: activeBets } = await supabase
+    .from('bets')
+    .select('user_id, market_id, outcome, shares')
+    .in('market_id', activeMarkets?.map(m => m.id) || []);
+
+  const leaderboardData = (profiles || []).map(profile => {
+    const userBets = (activeBets || []).filter(b => b.user_id === profile.id);
+    const equity = userBets.reduce((acc, bet) => {
+      const market = activeMarkets?.find(m => m.id === bet.market_id);
+      if (!market) return acc;
+      
+      const prob = (parseFloat(market.p) * parseFloat(market.no_pool)) / 
+                   ((1 - parseFloat(market.p)) * parseFloat(market.yes_pool) + parseFloat(market.p) * parseFloat(market.no_pool));
+      
+      const value = bet.outcome === 'YES' ? parseFloat(bet.shares) * prob : parseFloat(bet.shares) * (1 - prob);
+      return acc + value;
+    }, 0);
+
+    return {
+      ...profile,
+      netWorth: parseFloat(profile.credits) + equity
+    };
+  }).sort((a, b) => b.netWorth - a.netWorth);
 
   return (
     <main className="min-h-screen bg-black text-white p-8 font-sans pb-32">
@@ -29,10 +57,10 @@ export default async function LeaderboardPage() {
         </header>
 
         <div className="space-y-4">
-          {profiles && profiles.length > 0 ? (
-            profiles.map((profile, idx) => {
-              const isDebtor = parseFloat(profile.credits) < 0;
-              const isOracle = parseFloat(profile.credits) > 0;
+          {leaderboardData && leaderboardData.length > 0 ? (
+            leaderboardData.map((profile, idx) => {
+              const isDebtor = profile.netWorth < 0;
+              const isOracle = profile.netWorth > 0;
 
               return (
                 <div 
@@ -46,9 +74,9 @@ export default async function LeaderboardPage() {
                       {String(idx + 1).padStart(2, '0')}
                     </span>
                     <div>
-                      <div className="text-xl font-black tracking-tight text-white mb-1">
+                      <Link href={`/profile/${profile.username}`} className="text-xl font-black tracking-tight text-white mb-1 hover:text-emerald-500 transition-colors">
                         @{profile.username}
-                      </div>
+                      </Link>
                       <div className="text-[10px] font-black uppercase tracking-widest text-slate-600">
                         Active Trader
                       </div>
@@ -61,10 +89,10 @@ export default async function LeaderboardPage() {
                     }`}>
                       {isOracle && <TrendingUp className="w-4 h-4" />}
                       {isDebtor && <TrendingDown className="w-4 h-4" />}
-                      {parseFloat(profile.credits).toFixed(1)}
+                      {profile.netWorth.toFixed(1)}
                     </div>
                     <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-700 mt-1">
-                      SHOT BALANCE
+                      NET WORTH (SHOTS)
                     </div>
                   </div>
                 </div>

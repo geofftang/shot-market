@@ -1,12 +1,13 @@
 {
-  "name": "shot-market",
+  "name": "shot-caller",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed": "ts-node --compiler-options '{\"module\":\"commonjs\"}' src/scripts/seed.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

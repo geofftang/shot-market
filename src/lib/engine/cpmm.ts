@@ -13,11 +13,10 @@ export type BinaryPool = {
 
 /**
  * Calculates the probability (price) of the YES outcome.
- * P = n / (y + n)
  */
 export function getCpmmProbability(pool: BinaryPool, p: number): number {
   const { YES, NO } = pool;
-  return (p * NO) / ((1 - p) * YES + p * NO);
+  return (p * YES) / (p * YES + (1 - p) * NO);
 }
 
 /**

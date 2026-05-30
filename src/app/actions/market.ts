@@ -3,24 +3,67 @@
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { createClient as createServerClient } from '@/utils/supabase/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function createMarketAction(formData: FormData) {
-  // ... existing code
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  
+  const question = formData.get('question') as string;
+  const description = formData.get('description') as string;
+  const initialLiquidity = parseFloat(formData.get('initialLiquidity') as string) || 50;
+
+  if (!question) throw new Error('Question is required');
+
+  const { error } = await supabase
+    .from('markets')
+    .insert({
+      question,
+      description,
+      creator_id: user.id,
+      yes_pool: initialLiquidity,
+      no_pool: initialLiquidity,
+      p: 0.5,
+      status: 'open'
+    });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/');
+  redirect('/');
 }
 
 export async function deleteMarketAction(marketId: string) {
-  // ... existing code
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  
+  const { error } = await supabase
+    .from('markets')
+    .delete()
+    .eq('id', marketId)
+    .eq('creator_id', user.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/');
 }
 
 export async function resolveMarketAction(formData: FormData) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  const { data: { user } } = await supabase.auth.getUser();
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  
   const marketId = formData.get('marketId') as string;
   const outcome = formData.get('outcome') as 'resolved_yes' | 'resolved_no';
   const reason = formData.get('reason') as string;
@@ -48,11 +91,28 @@ export async function resolveMarketAction(formData: FormData) {
 
   if (betsError) throw new Error(betsError.message);
 
-  // 3. Payout winners & Close market (Transaction-like sequence)
-  // In a real app, use a DB function/RPC for atomicity. 
-  // For MVP, we'll loop and update.
-  
-  // Close the market first
+  // 3. Payout winners (using their personal weights)
+  if (winningBets && winningBets.length > 0) {
+    for (const bet of winningBets) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('credits, weight')
+        .eq('id', bet.user_id)
+        .single();
+        
+      if (profile) {
+        const personalWeight = parseFloat(profile.weight || '1.0');
+        const weightedPayout = parseFloat(bet.shares) * personalWeight;
+        
+        await supabase
+          .from('profiles')
+          .update({ credits: parseFloat(profile.credits) + weightedPayout })
+          .eq('id', bet.user_id);
+      }
+    }
+  }
+
+  // 4. Close market
   await supabase
     .from('markets')
     .update({ 
@@ -61,24 +121,6 @@ export async function resolveMarketAction(formData: FormData) {
       description: market.description + `\n\nRESOLUTION: ${reason}` 
     })
     .eq('id', marketId);
-
-  // Pay out each winner
-  if (winningBets && winningBets.length > 0) {
-    for (const bet of winningBets) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('credits')
-        .eq('id', bet.user_id)
-        .single();
-        
-      if (profile) {
-        await supabase
-          .from('profiles')
-          .update({ credits: parseFloat(profile.credits) + parseFloat(bet.shares) })
-          .eq('id', bet.user_id);
-      }
-    }
-  }
 
   revalidatePath('/');
   revalidatePath('/leaderboard');

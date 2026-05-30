@@ -60,26 +60,6 @@ export default function CreateMarketPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-bold uppercase tracking-widest text-slate-500 mb-3">
-              Initial Liquidity (Shots)
-            </label>
-            <div className="relative">
-              <input
-                name="initialLiquidity"
-                type="number"
-                defaultValue="100"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-4 px-4 text-2xl font-mono text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-              />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold uppercase text-xs tracking-widest">
-                Seeded Shots
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-slate-500 italic">
-              Higher liquidity makes the price move slower. Default is 100.
-            </p>
-          </div>
-
           <button
             disabled={isPending}
             className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-black py-5 rounded-xl shadow-xl shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 text-lg"
